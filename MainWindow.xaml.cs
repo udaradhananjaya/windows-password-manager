@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Media;
 using Windows.Security.Credentials.UI;
 
 namespace HelloAutofill;
@@ -20,25 +21,47 @@ public partial class MainWindow : Window
     private bool busy;
     private Guid? editing;
     private System.Windows.Forms.NotifyIcon? trayIcon;
-    public MainWindow() { InitializeComponent(); SourceInitialized += OnReady; Closed += OnClosed; StateChanged += OnStateChanged; }
+    private readonly IntPtr initialForeground = Native.GetForegroundWindow();
+    private bool exiting;
+    public MainWindow() { InitializeComponent(); SourceInitialized += OnReady; Closed += OnClosed; StateChanged += OnStateChanged; System.Windows.Application.Current.SessionEnding += (_, _) => exiting = true; }
     private void OnReady(object? sender, EventArgs e)
     {
         handle = new WindowInteropHelper(this).Handle;
+        PlaceOnActiveMonitor();
         int darkMode = 1; Native.DwmSetWindowAttribute(handle, 20, ref darkMode, sizeof(int));
         HwndSource.FromHwnd(handle).AddHook(Hook);
         var resource = System.Windows.Application.GetResourceStream(new Uri("pack://application:,,,/res/win_hello.ico")) ?? throw new InvalidOperationException("App icon missing.");
         using (resource.Stream) { using var icon = new System.Drawing.Icon(resource.Stream); trayIcon = new System.Windows.Forms.NotifyIcon { Icon = (System.Drawing.Icon)icon.Clone(), Text = "Hello Autofill", Visible = true }; }
         var menu = new System.Windows.Forms.ContextMenuStrip();
         menu.Items.Add("Open", null, (_, _) => RestoreWindow());
-        menu.Items.Add("Exit", null, (_, _) => Close());
+        menu.Items.Add("Exit", null, (_, _) => { exiting = true; Close(); });
         trayIcon.ContextMenuStrip = menu;
         trayIcon.DoubleClick += (_, _) => RestoreWindow();
         RefreshWindows();
         try { if (File.Exists(configPath)) entries = JsonSerializer.Deserialize<List<Entry>>(File.ReadAllText(configPath)) ?? new(); Refresh(); RegisterEntries(); }
         catch (Exception ex) { Status.Text = "Could not load entries: " + ex.Message; }
     }
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (!exiting) { e.Cancel = true; HideToTray(); }
+        base.OnClosing(e);
+    }
+    private void HideToTray() { Hide(); ShowInTaskbar = false; }
+    private void PlaceOnActiveMonitor()
+    {
+        var screen = initialForeground == IntPtr.Zero ? System.Windows.Forms.Screen.PrimaryScreen : System.Windows.Forms.Screen.FromHandle(initialForeground);
+        if (screen == null) return;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        int width = 486;
+        int height = 869;
+        var area = screen.WorkingArea;
+        int x = Math.Max(area.Left, area.Right - width - (int)Math.Round(16 * dpi.DpiScaleX));
+        int y = Math.Max(area.Top, area.Top + (area.Height - height) / 2);
+        Native.SetWindowPos(handle, IntPtr.Zero, x, y, width, height, 0x0004 | 0x0010);
+    }
+    private void Options_Click(object sender, RoutedEventArgs e) { var options = new OptionsWindow { Owner = this }; options.ShowDialog(); }
     private void OnClosed(object? sender, EventArgs e) { Unregister(); if (trayIcon != null) { trayIcon.Visible = false; trayIcon.Icon?.Dispose(); trayIcon.ContextMenuStrip?.Dispose(); trayIcon.Dispose(); } }
-    private void OnStateChanged(object? sender, EventArgs e) { if (WindowState == WindowState.Minimized) { Hide(); ShowInTaskbar = false; } }
+    private void OnStateChanged(object? sender, EventArgs e) { if (WindowState == WindowState.Minimized) HideToTray(); }
     private void RestoreWindow() { ShowInTaskbar = true; Show(); WindowState = WindowState.Normal; Activate(); }
     private void RefreshWindows_Click(object sender, RoutedEventArgs e) => RefreshWindows();
     private void RefreshWindows() { WindowPicker.ItemsSource = Native.OpenWindows(handle); WindowPicker.SelectedIndex = -1; }
@@ -47,10 +70,11 @@ public partial class MainWindow : Window
         if (WindowPicker.SelectedItem is WindowChoice choice) { Executable.Text = choice.Executable; WindowTitle.Text = choice.Title; }
     }
     private void Unregister() { foreach (int id in registered.Keys) Native.UnregisterHotKey(handle, id); registered.Clear(); }
+    private static bool IsShortcutKey(char key) => key is >= 'A' and <= 'Z' or >= '0' and <= '9';
     private void RegisterEntries()
     {
         Unregister(); var failed = new List<string>(); int id = 1;
-        foreach (var entry in entries) { if (entry.Key.Length != 1 || entry.Key[0] < 'A' || entry.Key[0] > 'Z' || !Native.RegisterHotKey(handle, id, 0x0001 | 0x0002 | 0x4000, entry.Key[0])) failed.Add(entry.Name); else registered[id] = entry; id++; }
+        foreach (var entry in entries) { if (entry.Key.Length != 1 || !IsShortcutKey(entry.Key[0]) || !Native.RegisterHotKey(handle, id, 0x0001 | 0x0002 | 0x0004 | 0x4000, entry.Key[0])) failed.Add(entry.Name); else registered[id] = entry; id++; }
         Status.Text = failed.Count == 0 ? "Ready. Select New to add a login." : "Shortcut unavailable: " + string.Join(", ", failed);
     }
     private void Refresh() { EntriesList.ItemsSource = null; EntriesList.ItemsSource = entries; }
@@ -67,7 +91,7 @@ public partial class MainWindow : Window
         try
         {
             string name = EntryName.Text.Trim(), exe = Executable.Text.Trim(), title = WindowTitle.Text.Trim(), key = Shortcut.Text.Trim().ToUpperInvariant();
-            if (name.Length == 0 || exe.Length == 0 || title.Length == 0 || key.Length != 1 || key[0] < 'A' || key[0] > 'Z' || Username.Text.Length == 0 || Password.Password.Length == 0) throw new InvalidOperationException("Complete every field and choose a shortcut letter A–Z.");
+            if (name.Length == 0 || exe.Length == 0 || title.Length == 0 || key.Length != 1 || !IsShortcutKey(key[0]) || Username.Text.Length == 0 || Password.Password.Length == 0) throw new InvalidOperationException("Complete every field and choose a shortcut letter A–Z or digit 0–9.");
             if (new[] { "chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "opera.exe", "vivaldi.exe" }.Contains(exe, StringComparer.OrdinalIgnoreCase)) throw new InvalidOperationException("Browser entries are not supported yet; website addresses cannot be verified.");
             if (exe.IndexOfAny(new[] { '/', '\\', ':' }) >= 0 || !exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Enter only an executable name ending in .exe.");
             if (Username.Text.Any(char.IsControl) || Password.Password.Any(char.IsControl)) throw new InvalidOperationException("Control characters in credentials are not supported.");
@@ -123,7 +147,7 @@ public partial class MainWindow : Window
 record Entry(Guid Id, string Name, string Executable, string Title, string Key)
 {
     [System.Text.Json.Serialization.JsonIgnore] public string Target => "HelloAutofill/Entry/" + Id.ToString("N");
-    [System.Text.Json.Serialization.JsonIgnore] public string Display => $"{Name} — Ctrl+Alt+{Key}";
+    [System.Text.Json.Serialization.JsonIgnore] public string Display => $"{Name} — Ctrl+Alt+Shift+{Key}";
 }
 record WindowChoice(string Executable, string Title)
 {
@@ -158,6 +182,7 @@ static class Native
     [StructLayout(LayoutKind.Explicit)] struct INPUTUNION { [FieldOffset(0)] public KEYBDINPUT keyboard; [FieldOffset(0)] public MOUSEINPUT mouse; }
     [StructLayout(LayoutKind.Sequential)] struct KEYBDINPUT { public ushort vk, scan; public uint flags, time; public UIntPtr extra; }
     [StructLayout(LayoutKind.Sequential)] struct MOUSEINPUT { public int dx, dy; public uint mouseData, flags, time; public UIntPtr extra; }
+    [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
     [DllImport("dwmapi.dll")] public static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
     [DllImport("user32.dll", SetLastError = true)] public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint key);
     [DllImport("user32.dll")] public static extern bool UnregisterHotKey(IntPtr hWnd, int id);

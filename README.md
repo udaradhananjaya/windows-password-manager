@@ -1,8 +1,8 @@
 # Hello Autofill
 
-A Windows 11 desktop prototype for multiple named logins. Each entry has a Ctrl+Alt+letter shortcut, an executable name, and an exact, case-sensitive window title. Login secrets are stored separately in Windows Credential Manager; entry names and matching settings are stored in `%LOCALAPPDATA%\HelloAutofill\entries.json`.
+A Windows 11 desktop prototype for multiple named logins. Each entry has a Ctrl+Alt+Shift+letter or digit shortcut, an executable name, and an exact, case-sensitive window title. Login secrets are stored separately in Windows Credential Manager; entry names and matching settings are stored in `%LOCALAPPDATA%\HelloAutofill\entries.json`.
 
-1. Open the app and select **New**. Enter a descriptive name, the executable filename (for example `javaw.exe`), exact window title, shortcut letter, username, and password. Select **Save**. A shortcut reported as unavailable will not work until the conflicting program is closed and this app is restarted.
+1. Open the app and select **New**. Enter a descriptive name, the executable filename (for example `javaw.exe`), exact window title, shortcut letter or digit, username, and password. Select **Save**. A shortcut reported as unavailable will not work until the conflicting program is closed and this app is restarted.
 2. Focus the username field in the specified desktop app. Press its shortcut and complete Windows Hello. The app types the username, presses Tab, then types the password. It does not submit the form.
 3. Test first with disposable credentials and verify that Tab moves to the correct password field. A login form may have a different tab order, and this prototype cannot reliably identify the password field in every app. If Tab moves to another field, the password can be typed there. Use this feature only after verifying the form's tab order.
 
@@ -16,4 +16,8 @@ Windows Hello gates filling through this app; it does not cryptographically bind
 
 ## Window picker and tray
 
-Select **Refresh windows**, then choose an open window to populate its executable and exact title. Some protected or elevated windows may not appear. Check the values before saving; window titles can change. Minimize to keep the app and its shortcuts running in the notification area. Double-click the tray icon or choose **Open** from its menu to restore the window; choose **Exit** to stop it. Closing the window also exits.
+Select **Refresh windows**, then choose an open window to populate its executable and exact title. Some protected or elevated windows may not appear. Check the values before saving; window titles can change. Minimize to keep the app and its shortcuts running in the notification area. Double-click the tray icon or choose **Open** from its menu to restore the window; choose **Exit** to stop it. Closing the main window also hides it to the tray. Use the tray menu’s **Exit** command to quit.
+
+## Options
+
+Use **Options** to enable or disable startup when you sign in to Windows. The setting applies only to your Windows account and points to the currently running executable; update the setting if you move or replace that executable.
