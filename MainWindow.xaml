@@ -1,0 +1,38 @@
+<Window x:Class="HelloAutofill.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Hello Autofill" Icon="res/win_hello.ico" Height="760" Width="660" MinWidth="570" MinHeight="580" WindowStartupLocation="CenterScreen" Background="#111217" Foreground="#F2F2F4" FontFamily="Segoe UI">
+ <Window.Resources>
+  <Style TargetType="TextBlock"><Setter Property="Foreground" Value="#E9E9ED"/></Style>
+  <Style TargetType="TextBox"><Setter Property="Background" Value="#25262E"/><Setter Property="Foreground" Value="White"/><Setter Property="CaretBrush" Value="White"/><Setter Property="BorderBrush" Value="#41424D"/><Setter Property="Padding" Value="10,8"/><Setter Property="Margin" Value="0,5,0,12"/></Style>
+  <Style TargetType="PasswordBox"><Setter Property="Background" Value="#25262E"/><Setter Property="Foreground" Value="White"/><Setter Property="CaretBrush" Value="White"/><Setter Property="BorderBrush" Value="#41424D"/><Setter Property="Padding" Value="10,8"/><Setter Property="Margin" Value="0,5,0,12"/></Style>
+  <Style TargetType="Button"><Setter Property="Foreground" Value="#FFFFFF"/><Setter Property="Background" Value="#30313B"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="16,9"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="ButtonBorder" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ButtonBorder" Property="Opacity" Value="0.8"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="ButtonBorder" Property="Opacity" Value="0.4"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+  <Style TargetType="ComboBoxItem">
+   <Setter Property="Foreground" Value="#F2F2F4"/><Setter Property="Background" Value="#25262E"/><Setter Property="Padding" Value="10,8"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBoxItem"><Border x:Name="ItemBackground" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="ItemBackground" Property="Background" Value="#702C36"/></Trigger><Trigger Property="IsSelected" Value="True"><Setter TargetName="ItemBackground" Property="Background" Value="#493039"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style TargetType="ComboBox">
+   <Setter Property="Foreground" Value="#F2F2F4"/><Setter Property="Background" Value="#25262E"/><Setter Property="BorderBrush" Value="#41424D"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Padding" Value="10,8"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox"><Grid>
+    <ToggleButton x:Name="Toggle" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" Focusable="False" ClickMode="Press"><ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border Background="#25262E" BorderBrush="#41424D" BorderThickness="1" CornerRadius="5"><Path HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" Fill="#D8D8DD" Data="M 0 0 L 8 0 L 4 5 Z"/></Border></ControlTemplate></ToggleButton.Template></ToggleButton>
+    <ContentPresenter Margin="10,8,32,8" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" VerticalAlignment="Center"/>
+    <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide"><Border Background="#25262E" BorderBrush="#41424D" BorderThickness="1" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" MaxHeight="280"><ScrollViewer CanContentScroll="True"><ItemsPresenter/></ScrollViewer></Border></Popup>
+   </Grid></ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style TargetType="ListBoxItem"><Setter Property="Padding" Value="10,8"/><Setter Property="Foreground" Value="#F2F2F4"/><Setter Property="Background" Value="Transparent"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem"><Border x:Name="ItemBorder" Background="{TemplateBinding Background}" CornerRadius="5" Padding="{TemplateBinding Padding}"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter TargetName="ItemBorder" Property="Background" Value="#702C36"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ItemBorder" Property="Background" Value="#493039"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+ </Window.Resources>
+ <Grid Margin="26"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="120"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+ <StackPanel><TextBlock FontSize="25" FontWeight="SemiBold" Text="Hello Autofill"/><TextBlock Foreground="#A8A8B2" Margin="0,3,0,0" Text="Your desktop logins, one shortcut away."/></StackPanel>
+ <Border Grid.Row="1" Background="#1B1C23" CornerRadius="8" Margin="0,16,0,12" Padding="4"><ListBox x:Name="EntriesList" Background="Transparent" BorderThickness="0" DisplayMemberPath="Display" SelectionChanged="SelectEntry"/></Border>
+ <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"><StackPanel Margin="0,0,6,0">
+ <TextBlock Text="ENTRY NAME" FontSize="11" FontWeight="SemiBold" Foreground="#B9BAC4"/><TextBox x:Name="EntryName"/>
+ <DockPanel Margin="0,2,0,8"><TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" Text="TARGET WINDOW" FontSize="11" FontWeight="SemiBold" Foreground="#B9BAC4"/><Button DockPanel.Dock="Right" Content="Refresh windows" Click="RefreshWindows_Click" Padding="10,5" HorizontalAlignment="Right"/></DockPanel>
+ <ComboBox x:Name="WindowPicker" DisplayMemberPath="Display" SelectionChanged="WindowPicker_SelectionChanged" Margin="0,0,0,12" Padding="6" ToolTip="Choose a currently open window"/>
+ <TextBlock Text="Executable name (for example javaw.exe)"/><TextBox x:Name="Executable"/>
+ <TextBlock Text="Exact window title (case-sensitive)"/><TextBox x:Name="WindowTitle"/>
+ <TextBlock Text="Shortcut: Ctrl + Alt + letter (A–Z)"/><TextBox x:Name="Shortcut" MaxLength="1"/>
+ <TextBlock Text="Username"/><TextBox x:Name="Username"/>
+ <TextBlock Text="Password (required when saving)"/><PasswordBox x:Name="Password"/>
+ <StackPanel Orientation="Horizontal"><Button Content="New" Click="New_Click"/><Button Content="Save login" Background="#D23C4E" Margin="8,0,0,0" Click="Save_Click"/><Button Content="Delete" Margin="8,0,0,0" Click="Delete_Click"/></StackPanel>
+ <TextBlock Margin="0,16,0,0" Foreground="#A8A8B2" TextWrapping="Wrap" Text="Focus the username field and press its shortcut. After Windows Hello, the app types username, Tab, and password. Website matching is not yet supported."/>
+ </StackPanel></ScrollViewer>
+ <Border Grid.Row="3" BorderBrush="#393A43" BorderThickness="0,1,0,0" Margin="0,12,0,0" Padding="0,12,0,0"><TextBlock x:Name="Status" TextWrapping="Wrap" Foreground="#F18B98"/></Border>
+ </Grid>
+</Window>
