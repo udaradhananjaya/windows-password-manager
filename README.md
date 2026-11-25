@@ -21,3 +21,9 @@ Select **Refresh windows**, then choose an open window to populate its executabl
 ## Options
 
 Use **Options** to enable or disable startup when you sign in to Windows. The setting applies only to your Windows account and points to the currently running executable; update the setting if you move or replace that executable.
+
+## About and updates
+
+**About** shows the app version, security limitations, a manual update check, and a link to GitHub releases. The app checks the public GitHub latest-release API on startup and every 12 hours while running, and shows a tray notification when it finds a newer version. Checks send an unauthenticated request to GitHub. A failed check does not mean the app is up to date. The user downloads and replaces the executable manually; no automatic code execution or binary replacement is performed.
+
+To publish a future release, set the project version to a three-part version (for example, `0.1.2`), commit and push it, then push the matching tag (for example, `v0.1.2`). GitHub Actions builds a self-contained Windows x64 executable and SHA-256 checksum and creates a draft release. Review and publish the draft on GitHub to make it available to the updater. The executable is not code-signed; the checksum checks integrity but does not establish publisher identity. Close the running app before replacing its executable, and update the Windows startup setting if the executable path changes.

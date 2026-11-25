@@ -23,6 +23,8 @@ public partial class MainWindow : Window
     private System.Windows.Forms.NotifyIcon? trayIcon;
     private readonly IntPtr initialForeground = Native.GetForegroundWindow();
     private bool exiting;
+    private readonly System.Windows.Threading.DispatcherTimer updateTimer = new() { Interval = TimeSpan.FromHours(12) };
+    private string? notifiedUpdate;
     public MainWindow() { InitializeComponent(); SourceInitialized += OnReady; Closed += OnClosed; StateChanged += OnStateChanged; System.Windows.Application.Current.SessionEnding += (_, _) => exiting = true; }
     private void OnReady(object? sender, EventArgs e)
     {
@@ -38,6 +40,9 @@ public partial class MainWindow : Window
         trayIcon.ContextMenuStrip = menu;
         trayIcon.DoubleClick += (_, _) => RestoreWindow();
         RefreshWindows();
+        updateTimer.Tick += async (_, _) => await CheckForUpdatesAsync();
+        updateTimer.Start();
+        _ = CheckForUpdatesAsync();
         try { if (File.Exists(configPath)) entries = JsonSerializer.Deserialize<List<Entry>>(File.ReadAllText(configPath)) ?? new(); Refresh(); RegisterEntries(); }
         catch (Exception ex) { Status.Text = "Could not load entries: " + ex.Message; }
     }
@@ -59,8 +64,23 @@ public partial class MainWindow : Window
         int y = Math.Max(area.Top, area.Top + (area.Height - height) / 2);
         Native.SetWindowPos(handle, IntPtr.Zero, x, y, width, height, 0x0004 | 0x0010);
     }
+    private void About_Click(object sender, RoutedEventArgs e) { var about = new AboutWindow { Owner = this }; about.ShowDialog(); }
+    private async Task CheckForUpdatesAsync()
+    {
+        try
+        {
+            var update = await UpdateChecker.CheckAsync();
+            if (!exiting && update.IsNewer && notifiedUpdate != update.Tag)
+            {
+                notifiedUpdate = update.Tag;
+                Status.Text = $"Update {update.Tag} available. Open About to visit releases.";
+                trayIcon?.ShowBalloonTip(5000, "Hello Autofill update", $"Version {update.Tag} is available. Open About to visit releases.", System.Windows.Forms.ToolTipIcon.Info);
+            }
+        }
+        catch (Exception ex) when (UpdateChecker.IsCheckFailure(ex)) { }
+    }
     private void Options_Click(object sender, RoutedEventArgs e) { var options = new OptionsWindow { Owner = this }; options.ShowDialog(); }
-    private void OnClosed(object? sender, EventArgs e) { Unregister(); if (trayIcon != null) { trayIcon.Visible = false; trayIcon.Icon?.Dispose(); trayIcon.ContextMenuStrip?.Dispose(); trayIcon.Dispose(); } }
+    private void OnClosed(object? sender, EventArgs e) { updateTimer.Stop(); Unregister(); if (trayIcon != null) { trayIcon.Visible = false; trayIcon.Icon?.Dispose(); trayIcon.ContextMenuStrip?.Dispose(); trayIcon.Dispose(); } }
     private void OnStateChanged(object? sender, EventArgs e) { if (WindowState == WindowState.Minimized) HideToTray(); }
     private void RestoreWindow() { ShowInTaskbar = true; Show(); WindowState = WindowState.Normal; Activate(); }
     private void RefreshWindows_Click(object sender, RoutedEventArgs e) => RefreshWindows();
@@ -151,7 +171,7 @@ record Entry(Guid Id, string Name, string Executable, string Title, string Key)
 }
 record WindowChoice(string Executable, string Title)
 {
-    public string Display => $"{Title} � {Executable}";
+    public string Display => $"{Title} - {Executable}";
 }
 record Login(string Username, string Password);
 
