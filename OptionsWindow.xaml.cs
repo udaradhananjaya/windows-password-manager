@@ -31,6 +31,7 @@ public partial class OptionsWindow : Window
                 string command = $"\"{executable}\"";
                 if (Path.GetFileNameWithoutExtension(executable).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
                     command += $" \"{typeof(App).Assembly.Location}\"";
+                command += " --startup";
                 if (command.Length > 260) throw new InvalidOperationException("The app path is too long for Windows startup.");
                 key.SetValue(ValueName, command, RegistryValueKind.String);
                 Status.Text = "Enabled for your Windows account.";

@@ -3,7 +3,7 @@
 A Windows 11 desktop prototype for multiple named logins. Each entry has a Ctrl+Alt+Shift+letter or digit shortcut, an executable name, and an exact, case-sensitive window title. Login secrets are stored separately in Windows Credential Manager; entry names and matching settings are stored in `%LOCALAPPDATA%\HelloAutofill\entries.json`.
 
 1. Open the app and select **New**. Enter a descriptive name, the executable filename (for example `javaw.exe`), exact window title, shortcut letter or digit, username, and password. Select **Save**. A shortcut reported as unavailable will not work until the conflicting program is closed and this app is restarted.
-2. Focus the username field in the specified desktop app. Press its shortcut and complete Windows Hello. The app types the username, presses Tab, then types the password. It does not submit the form.
+2. Focus the username field in the specified desktop app. Press its shortcut and complete Windows Hello. The app types the username, presses Tab, types the password, then presses Enter to submit the form.
 3. Test first with disposable credentials and verify that Tab moves to the correct password field. A login form may have a different tab order, and this prototype cannot reliably identify the password field in every app. If Tab moves to another field, the password can be typed there. Use this feature only after verifying the form's tab order.
 
 Edit an entry by selecting it, changing its settings, and re-entering both username and password; save. Delete removes the credential and entry. Keep the app open to use shortcuts. Window titles must match exactly and may change. Executable names and titles can be spoofed, so these checks are a guard against accidents, not a strong application identity check. Common browsers are blocked: website address matching is not implemented. Do not configure other browsers as desktop targets.
@@ -20,10 +20,10 @@ Select **Refresh windows**, then choose an open window to populate its executabl
 
 ## Options
 
-Use **Options** to enable or disable startup when you sign in to Windows. The setting applies only to your Windows account and points to the currently running executable; update the setting if you move or replace that executable.
+Use **Options** to enable or disable startup when you sign in to Windows. Startup launches the app in the system tray; use the tray icon to open it. The setting applies only to your Windows account and points to the currently running executable; update the setting if you move or replace that executable. If startup was enabled in an older version, disable and re-enable it to update the command.
 
 ## About and updates
 
-**About** shows the app version, security limitations, a manual update check, and a link to GitHub releases. The app checks the public GitHub latest-release API on startup and every 12 hours while running, and shows a tray notification when it finds a newer version. Checks send an unauthenticated request to GitHub. A failed check does not mean the app is up to date. The user downloads and replaces the executable manually; no automatic code execution or binary replacement is performed.
+**About** appears on first launch for each Windows user and shows the app version, security limitations, a manual update check, and a link to GitHub releases. The app checks the public GitHub latest-release API on startup and every 12 hours while running, and shows a tray notification when it finds a newer version. Checks send an unauthenticated request to GitHub. A failed check does not mean the app is up to date. The user downloads and replaces the executable manually; no automatic code execution or binary replacement is performed.
 
 To publish a future release, set the project version to a three-part version (for example, `0.1.2`), commit and push it, then push the matching tag (for example, `v0.1.2`). GitHub Actions builds a self-contained Windows x64 executable and SHA-256 checksum and creates a draft release. Review and publish the draft on GitHub to make it available to the updater. The executable is not code-signed; the checksum checks integrity but does not establish publisher identity. Close the running app before replacing its executable, and update the Windows startup setting if the executable path changes.

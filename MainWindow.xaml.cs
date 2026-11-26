@@ -15,6 +15,7 @@ namespace HelloAutofill;
 public partial class MainWindow : Window
 {
     private readonly string configPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HelloAutofill", "entries.json");
+    private readonly string aboutShownPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HelloAutofill", "about-shown");
     private List<Entry> entries = new();
     private readonly Dictionary<int, Entry> registered = new();
     private IntPtr handle;
@@ -23,9 +24,30 @@ public partial class MainWindow : Window
     private System.Windows.Forms.NotifyIcon? trayIcon;
     private readonly IntPtr initialForeground = Native.GetForegroundWindow();
     private bool exiting;
+    private bool startInTray;
     private readonly System.Windows.Threading.DispatcherTimer updateTimer = new() { Interval = TimeSpan.FromHours(12) };
     private string? notifiedUpdate;
-    public MainWindow() { InitializeComponent(); SourceInitialized += OnReady; Closed += OnClosed; StateChanged += OnStateChanged; System.Windows.Application.Current.SessionEnding += (_, _) => exiting = true; }
+    public MainWindow(bool startInTray = false) { this.startInTray = startInTray; InitializeComponent(); if (startInTray) { ShowActivated = false; ShowInTaskbar = false; WindowState = WindowState.Minimized; } SourceInitialized += OnReady; Loaded += OnFirstLoaded; Closed += OnClosed; StateChanged += OnStateChanged; System.Windows.Application.Current.SessionEnding += (_, _) => exiting = true; }
+    private void OnFirstLoaded(object sender, RoutedEventArgs e)
+    {
+        if (startInTray) { HideToTray(); return; }
+        ShowAboutOnFirstLaunch();
+    }
+    private void ShowAboutOnFirstLaunch()
+    {
+        if (File.Exists(aboutShownPath)) return;
+        var about = new AboutWindow { Owner = this };
+        about.ShowDialog();
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(aboutShownPath)!);
+            File.WriteAllText(aboutShownPath, "shown");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Status.Text = "Could not save the first-launch setting; About may appear again.";
+        }
+    }
     private void OnReady(object? sender, EventArgs e)
     {
         handle = new WindowInteropHelper(this).Handle;
@@ -82,7 +104,7 @@ public partial class MainWindow : Window
     private void Options_Click(object sender, RoutedEventArgs e) { var options = new OptionsWindow { Owner = this }; options.ShowDialog(); }
     private void OnClosed(object? sender, EventArgs e) { updateTimer.Stop(); Unregister(); if (trayIcon != null) { trayIcon.Visible = false; trayIcon.Icon?.Dispose(); trayIcon.ContextMenuStrip?.Dispose(); trayIcon.Dispose(); } }
     private void OnStateChanged(object? sender, EventArgs e) { if (WindowState == WindowState.Minimized) HideToTray(); }
-    private void RestoreWindow() { ShowInTaskbar = true; Show(); WindowState = WindowState.Normal; Activate(); }
+    private void RestoreWindow() { startInTray = false; ShowInTaskbar = true; Show(); WindowState = WindowState.Normal; Activate(); ShowAboutOnFirstLaunch(); }
     private void RefreshWindows_Click(object sender, RoutedEventArgs e) => RefreshWindows();
     private void RefreshWindows() { WindowPicker.ItemsSource = Native.OpenWindows(handle); WindowPicker.SelectedIndex = -1; }
     private void WindowPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -158,6 +180,9 @@ public partial class MainWindow : Window
             var next = Native.FocusedControl(target);
             if (next == IntPtr.Zero) throw new InvalidOperationException("Could not identify the field after Tab; password not typed.");
             Native.TypeUnicode(login.Password, target, next);
+            await Task.Delay(200);
+            if (Native.GetForegroundWindow() != target || Native.FocusedControl(target) != next || !Native.Matches(target, entry)) throw new InvalidOperationException("Target or focus changed after password; Enter not sent.");
+            Native.SendEnter();
             Status.Text = "Filled " + entry.Name + ".";
         }
         catch (Exception ex) { Status.Text = "Insertion stopped: " + ex.Message; }
@@ -241,6 +266,11 @@ static class Native
     {
         var inputs = new INPUT[2]; inputs[0].type = inputs[1].type = 1; inputs[0].data.keyboard.vk = inputs[1].data.keyboard.vk = 9; inputs[1].data.keyboard.flags = 2;
         if (SendInput(2, inputs, Marshal.SizeOf<INPUT>()) != 2) throw new Win32Exception(Marshal.GetLastWin32Error(), "Windows rejected Tab input.");
+    }
+    public static void SendEnter()
+    {
+        var inputs = new INPUT[2]; inputs[0].type = inputs[1].type = 1; inputs[0].data.keyboard.vk = inputs[1].data.keyboard.vk = 0x0D; inputs[1].data.keyboard.flags = 2;
+        if (SendInput(2, inputs, Marshal.SizeOf<INPUT>()) != 2) throw new Win32Exception(Marshal.GetLastWin32Error(), "Windows rejected Enter input.");
     }
     public static IntPtr FocusedControl(IntPtr window) { uint thread = GetWindowThreadProcessId(window, out _); var info = new GUITHREADINFO { cbSize = (uint)Marshal.SizeOf<GUITHREADINFO>() }; return thread != 0 && GetGUIThreadInfo(thread, ref info) ? info.hwndFocus : IntPtr.Zero; }
     public static void TypeUnicode(string value, IntPtr target, IntPtr focus)

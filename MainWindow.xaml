@@ -31,7 +31,7 @@
  <TextBlock Text="Username"/><TextBox x:Name="Username"/>
  <TextBlock Text="Password (required when saving)"/><PasswordBox x:Name="Password"/>
  <StackPanel Orientation="Horizontal"><Button Content="New" Click="New_Click"/><Button Content="Save login" Background="#D23C4E" Margin="8,0,0,0" Click="Save_Click"/><Button Content="Delete" Margin="8,0,0,0" Click="Delete_Click"/></StackPanel>
- <TextBlock Margin="0,16,0,0" Foreground="#A8A8B2" TextWrapping="Wrap" Text="Focus the username field and press its shortcut. After Windows Hello, the app types username, Tab, and password. Website matching is not yet supported."/>
+ <TextBlock Margin="0,16,0,0" Foreground="#A8A8B2" TextWrapping="Wrap" Text="Focus the username field and press its shortcut. After Windows Hello, the app types username, Tab, password, and Enter. Website matching is not yet supported."/>
  </StackPanel></ScrollViewer>
  <Border Grid.Row="3" BorderBrush="#393A43" BorderThickness="0,1,0,0" Margin="0,12,0,0" Padding="0,12,0,0"><TextBlock x:Name="Status" TextWrapping="Wrap" Foreground="#F18B98"/></Border>
  </Grid>
