@@ -16,8 +16,12 @@ public partial class MainWindow : Window
 {
     private readonly string configPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HelloAutofill", "entries.json");
     private readonly string aboutShownPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HelloAutofill", "about-shown");
+    private readonly string developmentPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HelloAutofill", "development-options.json");
     private List<Entry> entries = new();
     private readonly Dictionary<int, Entry> registered = new();
+    private readonly Dictionary<int, DevelopmentOption> developmentHotkeys = new();
+    private List<DevelopmentOption> developmentOptions = DevelopmentOption.Defaults();
+    private int titleClicks;
     private IntPtr handle;
     private bool busy;
     private Guid? editing;
@@ -65,7 +69,7 @@ public partial class MainWindow : Window
         updateTimer.Tick += async (_, _) => await CheckForUpdatesAsync();
         updateTimer.Start();
         _ = CheckForUpdatesAsync();
-        try { if (File.Exists(configPath)) entries = JsonSerializer.Deserialize<List<Entry>>(File.ReadAllText(configPath)) ?? new(); Refresh(); RegisterEntries(); }
+        try { if (File.Exists(configPath)) entries = JsonSerializer.Deserialize<List<Entry>>(File.ReadAllText(configPath)) ?? new(); if (File.Exists(developmentPath)) developmentOptions = JsonSerializer.Deserialize<List<DevelopmentOption>>(File.ReadAllText(developmentPath)) ?? DevelopmentOption.Defaults(); Refresh(); RegisterEntries(); }
         catch (Exception ex) { Status.Text = "Could not load entries: " + ex.Message; }
     }
     protected override void OnClosing(CancelEventArgs e)
@@ -87,6 +91,23 @@ public partial class MainWindow : Window
         Native.SetWindowPos(handle, IntPtr.Zero, x, y, width, height, 0x0004 | 0x0010);
     }
     private void About_Click(object sender, RoutedEventArgs e) { var about = new AboutWindow { Owner = this }; about.ShowDialog(); }
+    private void Title_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (++titleClicks < 7) return;
+        titleClicks = 0;
+        var dialog = new DevelopmentWindow(developmentOptions, entries.Select(x => x.Key)) { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(developmentPath)!);
+            string temp = developmentPath + ".tmp";
+            File.WriteAllText(temp, JsonSerializer.Serialize(dialog.Options, new JsonSerializerOptions { WriteIndented = true }));
+            File.Move(temp, developmentPath, true);
+            developmentOptions = dialog.Options;
+            RegisterEntries();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Status.Text = "Could not save development options: " + ex.Message; }
+    }
     private async Task CheckForUpdatesAsync()
     {
         try
@@ -111,12 +132,19 @@ public partial class MainWindow : Window
     {
         if (WindowPicker.SelectedItem is WindowChoice choice) { Executable.Text = choice.Executable; WindowTitle.Text = choice.Title; }
     }
-    private void Unregister() { foreach (int id in registered.Keys) Native.UnregisterHotKey(handle, id); registered.Clear(); }
+    private void Unregister() { foreach (int id in registered.Keys) Native.UnregisterHotKey(handle, id); foreach (int id in developmentHotkeys.Keys) Native.UnregisterHotKey(handle, id); registered.Clear(); developmentHotkeys.Clear(); }
     private static bool IsShortcutKey(char key) => key is >= 'A' and <= 'Z' or >= '0' and <= '9';
     private void RegisterEntries()
     {
         Unregister(); var failed = new List<string>(); int id = 1;
         foreach (var entry in entries) { if (entry.Key.Length != 1 || !IsShortcutKey(entry.Key[0]) || !Native.RegisterHotKey(handle, id, 0x0001 | 0x0002 | 0x0004 | 0x4000, entry.Key[0])) failed.Add(entry.Name); else registered[id] = entry; id++; }
+        id = 10000;
+        foreach (var option in developmentOptions.Where(x => x.Enabled))
+        {
+            if (option.Key.Length != 1 || !IsShortcutKey(option.Key[0]) || !Native.RegisterHotKey(handle, id, 0x0001 | 0x0002 | 0x0004 | 0x4000, option.Key[0])) failed.Add(option.Name);
+            else developmentHotkeys[id] = option;
+            id++;
+        }
         Status.Text = failed.Count == 0 ? "Ready. Select New to add a login." : "Shortcut unavailable: " + string.Join(", ", failed);
     }
     private void Refresh() { EntriesList.ItemsSource = null; EntriesList.ItemsSource = entries; }
@@ -138,6 +166,7 @@ public partial class MainWindow : Window
             if (exe.IndexOfAny(new[] { '/', '\\', ':' }) >= 0 || !exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Enter only an executable name ending in .exe.");
             if (Username.Text.Any(char.IsControl) || Password.Password.Any(char.IsControl)) throw new InvalidOperationException("Control characters in credentials are not supported.");
             if (entries.Any(x => x.Id != editing && x.Key == key)) throw new InvalidOperationException("That shortcut is already assigned.");
+            if (developmentOptions.Any(x => x.Enabled && string.Equals(x.Key, key, StringComparison.OrdinalIgnoreCase))) throw new InvalidOperationException("That shortcut is assigned to a development option.");
             var entry = new Entry(editing ?? Guid.NewGuid(), name, exe, title, key);
             CredentialStore.Save(entry.Target, new Login(Username.Text, Password.Password));
             int index = entries.FindIndex(x => x.Id == entry.Id); if (index < 0) entries.Add(entry); else entries[index] = entry;
@@ -154,6 +183,13 @@ public partial class MainWindow : Window
     }
     private IntPtr Hook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        if (msg == 0x0312 && developmentHotkeys.TryGetValue(wParam.ToInt32(), out var option))
+        {
+            handled = true;
+            Status.Text = option.Name + " activated (placeholder).";
+            trayIcon?.ShowBalloonTip(3000, "Development option", option.Name + " activated (placeholder).", System.Windows.Forms.ToolTipIcon.Info);
+            return IntPtr.Zero;
+        }
         if (msg == 0x0312 && !busy && registered.TryGetValue(wParam.ToInt32(), out var entry)) { handled = true; _ = InsertAsync(entry); }
         return IntPtr.Zero;
     }
